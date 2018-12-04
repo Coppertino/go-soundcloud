@@ -68,6 +68,14 @@ func (u *UserApi) Favorites(params url.Values) ([]*Track, error) {
 	return ret, err
 }
 
+func (u *UserApi) FavoritesAdd(trackId string) error {
+	return u.api.put(u.base+"/favorites/"+trackId, nil, nil)
+}
+
+func (u *UserApi) FavoritesDelete(trackId string) error {
+	return u.api.delete(u.base+"/favorites/"+trackId, nil, nil)
+}
+
 func (u *UserApi) Favorite(id string) *trackEndpoint {
 	return u.api.newTrackEndpoint(u.base, "favorites", id)
 }
