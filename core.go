@@ -3,8 +3,7 @@ package soundcloud
 
 import (
 	"encoding/json"
-	"errors"
-	"fmt"
+	"github.com/pkg/errors"
 	"io"
 	"net/http"
 	"net/url"
@@ -12,14 +11,13 @@ import (
 )
 
 var (
-	baseUrl              = "https://api.soundcloud.com"
-	client  *http.Client = &http.Client{
-		CheckRedirect: noRedirects,
-	}
+	ErrNoRedirects = errors.New("no redirects")
+	baseUrl        = "https://api.soundcloud.com"
+	client         = &http.Client{CheckRedirect: noRedirects}
 )
 
-func noRedirects(req *http.Request, via []*http.Request) error {
-	return errors.New("No redirects!")
+func noRedirects(_ *http.Request, _ []*http.Request) error {
+	return ErrNoRedirects
 }
 
 type Api struct {
@@ -44,7 +42,7 @@ func buildGetRequest(urlStr string, params url.Values) (*http.Request, error) {
 	// If we are getting, then we can't merge query params
 	if params != nil {
 		if u.RawQuery != "" {
-			return nil, fmt.Errorf("Cannot merge query params in urlStr and params")
+			return nil, errors.New("cannot merge query params in urlStr and params")
 		}
 		u.RawQuery = params.Encode()
 	}
@@ -62,7 +60,7 @@ func buildNonGetRequest(method, urlStr string, params url.Values) (*http.Request
 	// If we are getting, then we can't merge query params
 	if u.RawQuery != "" {
 		if params != nil {
-			return nil, fmt.Errorf("Cannot merge query params in urlStr and params")
+			return nil, errors.New("cannot merge query params in urlStr and params")
 		}
 		params = u.Query()
 		u.RawQuery = ""
@@ -83,7 +81,7 @@ func (api *Api) extendParams(p url.Values, auth ...bool) (url.Values, error) {
 		if api.AccessToken != "" {
 			p.Set("oauth_token", api.AccessToken)
 		} else {
-			return p, errors.New("Access token required to use this endpoint")
+			return p, errors.New("access token required to use this endpoint")
 		}
 	} else {
 		p.Set("client_id", api.ClientId)
@@ -105,18 +103,18 @@ func (api *Api) get(path string, params url.Values, r interface{}, auth ...bool)
 }
 
 func (api *Api) post(path string, params url.Values, r interface{}, auth ...bool) error {
-	return api.nonget("POST", path, params, r)
+	return api.nonGet("POST", path, params, r)
 }
 
 func (api *Api) put(path string, params url.Values, r interface{}, auth ...bool) error {
-	return api.nonget("PUT", path, params, r)
+	return api.nonGet("PUT", path, params, r)
 }
 
 func (api *Api) delete(path string, params url.Values, r interface{}, auth ...bool) error {
-	return api.nonget("DELETE", path, params, r)
+	return api.nonGet("DELETE", path, params, r)
 }
 
-func (api *Api) nonget(method, path string, params url.Values, r interface{}, auth ...bool) error {
+func (api *Api) nonGet(method, path string, params url.Values, r interface{}, auth ...bool) error {
 	params, err := api.extendParams(params, auth...)
 	if err != nil {
 		return err
@@ -131,7 +129,7 @@ func (api *Api) nonget(method, path string, params url.Values, r interface{}, au
 
 func (api *Api) do(req *http.Request, r interface{}) error {
 	resp, err := client.Do(req)
-	if urlerr, ok := err.(*url.Error); ok && urlerr.Err.Error() == "No redirects!" {
+	if urlErr, ok := err.(*url.Error); ok && urlErr.Err == ErrNoRedirects {
 		err = nil
 	} else if err != nil {
 		return err
@@ -152,7 +150,7 @@ func decodeResponse(body io.Reader, to interface{}) error {
 	err := json.NewDecoder(body).Decode(to)
 
 	if err != nil {
-		return fmt.Errorf("soundcloud: error decoding body: %s", err.Error())
+		return errors.Wrap(err, "soundcloud: error decoding body")
 	}
 	return nil
 }
